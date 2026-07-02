@@ -32,6 +32,22 @@ describe('parseCliArgs', () => {
         })
     })
 
+    test('parses MPP USDC Permit2 run arguments', () => {
+        expect(parseCliArgs([
+            '--mode',
+            'run',
+            '--protocol',
+            'mpp',
+            '--profile',
+            'usdc-permit2',
+        ])).toEqual({
+            mode: 'run',
+            protocol: 'mpp',
+            profile: 'usdc-permit2',
+            port: undefined,
+        })
+    })
+
     test('parses optional port as an integer', () => {
         expect(parseCliArgs([
             '--mode',

@@ -6,7 +6,7 @@ export type PaymentProfile = typeof paymentProfiles[number]
 
 const protocolProfiles = {
     x402: ['usdc-eip3009', 'usdc-permit2', 'usdt-permit2'],
-    mpp: ['usdc-eip3009', 'usdt-permit2'],
+    mpp: ['usdc-eip3009', 'usdc-permit2', 'usdt-permit2'],
 } as const satisfies Record<Protocol, readonly PaymentProfile[]>
 
 export const BASE_SEPOLIA_NETWORK = 'eip155:84532'

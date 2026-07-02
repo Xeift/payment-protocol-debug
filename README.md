@@ -18,6 +18,7 @@ bun src/payment-debug.ts --mode run --protocol x402 --profile usdc-eip3009
 bun src/payment-debug.ts --mode run --protocol x402 --profile usdc-permit2
 bun src/payment-debug.ts --mode run --protocol x402 --profile usdt-permit2
 bun src/payment-debug.ts --mode run --protocol mpp --profile usdc-eip3009
+bun src/payment-debug.ts --mode run --protocol mpp --profile usdc-permit2
 bun src/payment-debug.ts --mode run --protocol mpp --profile usdt-permit2
 ```
 
@@ -47,6 +48,5 @@ bun src/payment-debug.ts --mode server --protocol x402 --port 48123
 `mpp` supports:
 
 - `usdc-eip3009`
+- `usdc-permit2`
 - `usdt-permit2`
-
-`mpp` with `usdc-permit2` is rejected directly.

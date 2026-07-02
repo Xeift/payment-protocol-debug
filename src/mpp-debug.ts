@@ -23,6 +23,7 @@ import {
 import { createHttpTraceFetch } from './http-trace.js'
 import { printBlock, printJson } from './output.js'
 import {
+    BASE_SEPOLIA_USDC,
     BASE_SEPOLIA_USDT,
     type PaymentProfile,
 } from './profiles.js'
@@ -36,10 +37,11 @@ const EIP3009_ABI = parseAbi([
     'function transferWithAuthorization(address from, address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce, bytes signature)',
 ])
 
-type MppPaymentProfile = Extract<PaymentProfile, 'usdc-eip3009' | 'usdt-permit2'>
+type MppPaymentProfile = PaymentProfile
 
 const mppPaths = {
     'usdc-eip3009': '/premium/usdc-eip3009',
+    'usdc-permit2': '/premium/usdc-permit2',
     'usdt-permit2': '/premium/usdt-permit2',
 } as const satisfies Record<MppPaymentProfile, string>
 
@@ -58,7 +60,7 @@ type PaymentResult = {
 type PaymentHandler = (request: Request) => Promise<PaymentResult>
 
 function assertMppPaymentProfile(profile: PaymentProfile): asserts profile is MppPaymentProfile {
-    if (profile !== 'usdc-eip3009' && profile !== 'usdt-permit2') {
+    if (profile !== 'usdc-eip3009' && profile !== 'usdc-permit2' && profile !== 'usdt-permit2') {
         throw new Error(`Protocol mpp does not support profile ${profile}`)
     }
 }
@@ -206,6 +208,26 @@ function createMppApp() {
         console.log(JSON.stringify(receipt, null, 2))
     })
 
+    const usdcPermit2Mppx = QuicknodeServerMppx.create({
+        secretKey,
+        methods: [
+            quicknodeServerEvm.charge({
+                chain: 'base-sepolia',
+                rpcUrl,
+                recipient,
+                submitter: { privateKey: submitterPrivateKey },
+                store: quicknodeStore,
+                customToken: {
+                    address: BASE_SEPOLIA_USDC,
+                    decimals: STABLECOIN_DECIMALS,
+                    symbol: 'USDC',
+                    credentialTypes: ['permit2'],
+                },
+                credentialTypes: ['permit2'],
+            }),
+        ],
+    })
+
     const usdtPermit2Mppx = QuicknodeServerMppx.create({
         secretKey,
         methods: [
@@ -230,6 +252,10 @@ function createMppApp() {
         amount: PREMIUM_AMOUNT,
         description: PREMIUM_DESCRIPTION,
     })
+    const premiumUsdcPermit2Charge = usdcPermit2Mppx.evm.charge({
+        amount: PREMIUM_AMOUNT,
+        description: PREMIUM_DESCRIPTION,
+    })
     const premiumUsdtPermit2Charge = usdtPermit2Mppx.evm.charge({
         amount: PREMIUM_AMOUNT,
         description: PREMIUM_DESCRIPTION,
@@ -239,12 +265,16 @@ function createMppApp() {
         res.json({
             ok: true,
             protocol: 'mpp',
-            profiles: ['usdc-eip3009', 'usdt-permit2'],
+            profiles: ['usdc-eip3009', 'usdc-permit2', 'usdt-permit2'],
         })
     })
 
     app.get('/premium/usdc-eip3009', paymentMiddleware(premiumUsdcEip3009Charge), (_req, res) => {
         res.json({ data: 'paid MPP USDC EIP-3009 protocol debug content' })
+    })
+
+    app.get('/premium/usdc-permit2', paymentMiddleware(premiumUsdcPermit2Charge), (_req, res) => {
+        res.json({ data: 'paid MPP USDC Permit2 protocol debug content' })
     })
 
     app.get('/premium/usdt-permit2', paymentMiddleware(premiumUsdtPermit2Charge), (_req, res) => {
@@ -268,7 +298,7 @@ function createMppPaymentClient(profile: MppPaymentProfile) {
         printDecodedResponseHeaders: printDecodedMppResponseHeaders,
     })
 
-    if (profile === 'usdt-permit2') {
+    if (profile === 'usdc-permit2' || profile === 'usdt-permit2') {
         return MppxClient.create({
             methods: [
                 quicknodeClientEvm.charge({
@@ -358,7 +388,7 @@ export async function serveMpp(port: number) {
                     printJson({
                         mode: 'server',
                         protocol: 'mpp',
-                        profiles: ['usdc-eip3009', 'usdt-permit2'],
+                        profiles: ['usdc-eip3009', 'usdc-permit2', 'usdt-permit2'],
                         port,
                     })
                 },

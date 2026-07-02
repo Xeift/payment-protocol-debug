@@ -23,12 +23,12 @@ describe('profiles', () => {
         ])
         expect(getProtocolProfiles('mpp')).toEqual([
             'usdc-eip3009',
+            'usdc-permit2',
             'usdt-permit2',
         ])
     })
 
-    test('rejects unsupported MPP USDC Permit2 without fallback', () => {
-        expect(() => assertProtocolProfile('mpp', 'usdc-permit2'))
-            .toThrow('Protocol mpp does not support profile usdc-permit2')
+    test('supports MPP USDC Permit2 explicitly', () => {
+        expect(() => assertProtocolProfile('mpp', 'usdc-permit2')).not.toThrow()
     })
 })
