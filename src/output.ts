@@ -17,6 +17,7 @@ export async function printBlock(
         print: () => void | Promise<void>
     }>,
     color?: Color,
+    titleSuffix?: string,
 ) {
     const originalLog = console.log
 
@@ -27,7 +28,11 @@ export async function printBlock(
     }
 
     try {
-        console.log(styleText('inverse', title))
+        if (titleSuffix) {
+            console.log(`${styleText('inverse', title)} ${titleSuffix}`)
+        } else {
+            console.log(styleText('inverse', title))
+        }
 
         for (const section of sections) {
             console.log('')

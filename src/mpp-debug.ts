@@ -1,3 +1,4 @@
+import { styleText } from 'node:util'
 import { evm as quicknodeClientEvm } from '@quicknode/mpp/client'
 import {
     Mppx as QuicknodeServerMppx,
@@ -351,6 +352,10 @@ async function runMppClient(port: number, profile: PaymentProfile) {
 }
 
 export async function runMpp(profile: PaymentProfile, port: number) {
+    const titleSuffix = profile === 'usdc-eip3009'
+        ? `[EIP-3009 generated using ${styleText('underline', 'mppx')}]`
+        : `[Permit2 generated using ${styleText('underline', '@quicknode/mpp')} (very unstable)]`
+
     await printBlock(
         'PAYMENT DEBUG SELECTION',
         [
@@ -367,6 +372,7 @@ export async function runMpp(profile: PaymentProfile, port: number) {
             },
         ],
         'magenta',
+        titleSuffix,
     )
 
     const server = await listen(createMppApp(), port, 'MPP debug server')
@@ -395,6 +401,7 @@ export async function serveMpp(port: number) {
             },
         ],
         'magenta',
+        `[EIP-3009 generated using ${styleText('underline', 'mppx')}, Permit2 generated using ${styleText('underline', '@quicknode/mpp')} (very unstable)]`,
     )
 
     await listen(createMppApp(), port, 'MPP debug server')

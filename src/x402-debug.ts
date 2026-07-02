@@ -1,3 +1,4 @@
+import { styleText } from 'node:util'
 import type { PaymentOption } from '@x402/core/http'
 import { HTTPFacilitatorClient, x402ResourceServer, type RoutesConfig } from '@x402/core/server'
 import type { PaymentRequirements } from '@x402/core/types'
@@ -174,6 +175,10 @@ async function runX402Client(port: number, profile: PaymentProfile) {
 }
 
 export async function runX402(profile: PaymentProfile, port: number) {
+    const titleSuffix = profile === 'usdc-eip3009'
+        ? `[EIP-3009 generated using ${styleText('underline', '@x402/evm')}]`
+        : `[Permit2 generated using ${styleText('underline', '@x402/evm')}]`
+
     await printBlock(
         'PAYMENT DEBUG SELECTION',
         [
@@ -190,6 +195,7 @@ export async function runX402(profile: PaymentProfile, port: number) {
             },
         ],
         'magenta',
+        titleSuffix,
     )
 
     const server = await listen(createX402App(), port, 'x402 debug server')
@@ -218,6 +224,7 @@ export async function serveX402(port: number) {
             },
         ],
         'magenta',
+        `[EIP-3009 generated using ${styleText('underline', '@x402/evm')}, Permit2 generated using ${styleText('underline', '@x402/evm')}]`,
     )
 
     await listen(createX402App(), port, 'x402 debug server')
