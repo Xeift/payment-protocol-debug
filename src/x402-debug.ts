@@ -189,7 +189,7 @@ export async function runX402(profile: PaymentProfile, port: number) {
                 },
             },
         ],
-        'blue',
+        'magenta',
     )
 
     const server = await listen(createX402App(), port, 'x402 debug server')
@@ -217,7 +217,7 @@ export async function serveX402(port: number) {
                 },
             },
         ],
-        'blue',
+        'magenta',
     )
 
     await listen(createX402App(), port, 'x402 debug server')

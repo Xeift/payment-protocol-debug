@@ -366,7 +366,7 @@ export async function runMpp(profile: PaymentProfile, port: number) {
                 },
             },
         ],
-        'blue',
+        'magenta',
     )
 
     const server = await listen(createMppApp(), port, 'MPP debug server')
@@ -394,7 +394,7 @@ export async function serveMpp(port: number) {
                 },
             },
         ],
-        'blue',
+        'magenta',
     )
 
     await listen(createMppApp(), port, 'MPP debug server')
