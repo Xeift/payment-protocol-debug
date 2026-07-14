@@ -1,12 +1,12 @@
 import { styleText } from 'node:util'
-import type { PaymentOption } from '@x402/core/http'
+import { x402Client } from '@x402/core/client'
 import { HTTPFacilitatorClient, x402ResourceServer, type RoutesConfig } from '@x402/core/server'
-import type { PaymentRequirements } from '@x402/core/types'
+import type { Network, PaymentRequirements, Price } from '@x402/core/types'
 import { ExactEvmScheme as ExactEvmClientScheme } from '@x402/evm/exact/client'
 import { ExactEvmScheme as ExactEvmServerScheme } from '@x402/evm/exact/server'
 import { paymentMiddleware } from '@x402/express'
 import { declareErc20ApprovalGasSponsoringExtension } from '@x402/extensions'
-import { wrapFetchWithPayment, x402Client } from '@x402/fetch'
+import { wrapFetchWithPayment } from '@x402/fetch'
 import express from 'express'
 import { privateKeyToAccount } from 'viem/accounts'
 import { withEip712Logging } from './eip712.js'
@@ -27,7 +27,15 @@ import { closeServer, listen } from './server.js'
 
 const STABLECOIN_AMOUNT = '10000'
 
-function createX402Accept(profile: PaymentProfile): PaymentOption {
+export type X402Accept = {
+    scheme: string
+    network: Network
+    payTo: string
+    price: Price
+    maxTimeoutSeconds: number
+}
+
+export function createX402Accept(profile: PaymentProfile): X402Accept {
     const asset = profileAssets[profile]
     const extra = (() => {
         if (asset.assetTransferMethod === 'eip3009') {
@@ -36,9 +44,9 @@ function createX402Accept(profile: PaymentProfile): PaymentOption {
             }
 
             return {
-            assetTransferMethod: asset.assetTransferMethod,
-            name: asset.name,
-            version: asset.version,
+                assetTransferMethod: asset.assetTransferMethod,
+                name: asset.name,
+                version: asset.version,
             }
         }
 
@@ -60,10 +68,7 @@ function createX402Accept(profile: PaymentProfile): PaymentOption {
     }
 }
 
-function createX402App() {
-    const app = express()
-    app.use(express.json())
-
+export function createX402ResourceServer() {
     const facilitatorUrl = requiredEnv('X402_FACILITATOR_URL')
     const httpFacilitatorClient = new HTTPFacilitatorClient({
         url: facilitatorUrl,
@@ -74,6 +79,15 @@ function createX402App() {
     )
     const resourceServer = new x402ResourceServer(facilitatorClient)
     resourceServer.register(BASE_SEPOLIA_NETWORK, new ExactEvmServerScheme())
+
+    return resourceServer
+}
+
+function createX402App() {
+    const app = express()
+    app.use(express.json())
+
+    const resourceServer = createX402ResourceServer()
 
     const routes = {
         'GET /premium': {
@@ -107,7 +121,7 @@ function createX402App() {
     return app
 }
 
-function selectX402PaymentRequirement(
+export function selectX402PaymentRequirement(
     profile: PaymentProfile,
     paymentRequirements: PaymentRequirements[],
 ): PaymentRequirements {
@@ -124,7 +138,7 @@ function selectX402PaymentRequirement(
     return selectedRequirement
 }
 
-async function runX402Client(port: number, profile: PaymentProfile) {
+export function createX402PaymentClient(profile: PaymentProfile) {
     const baseAccount = privateKeyToAccount(
         requiredEnv('X402_CLIENT_PRIVATE_KEY') as `0x${string}`,
     )
@@ -138,7 +152,11 @@ async function runX402Client(port: number, profile: PaymentProfile) {
         : new ExactEvmClientScheme(account)
 
     client.register(BASE_SEPOLIA_NETWORK, exactScheme)
+    return client
+}
 
+async function runX402Client(port: number, profile: PaymentProfile) {
+    const client = createX402PaymentClient(profile)
     const fetchWithPayment = wrapFetchWithPayment(
         createHttpTraceFetch({
             requestTitlePrefix: 'X402',

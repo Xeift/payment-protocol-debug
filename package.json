@@ -9,12 +9,14 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.12.1",
     "@quicknode/mpp": "0.2.0",
     "@x402/core": "2.13.0",
     "@x402/evm": "2.13.0",
     "@x402/express": "2.13.0",
     "@x402/extensions": "2.13.0",
     "@x402/fetch": "2.13.0",
+    "@x402/mcp": "2.13.0",
     "express": "5.2.1",
     "mppx": "0.7.0",
     "viem": "2.51.0"

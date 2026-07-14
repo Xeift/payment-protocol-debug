@@ -7,15 +7,17 @@ import {
 } from './profiles.js'
 
 export type Mode = 'run' | 'server'
+export type ServerKind = 'http' | 'mcp'
 
 export type CliOptions = {
     mode: Mode
     protocol: Protocol
     profile: PaymentProfile | undefined
     port: number | undefined
+    server: ServerKind
 }
 
-const argumentNames = new Set(['--mode', '--protocol', '--profile', '--port'])
+const argumentNames = new Set(['--mode', '--protocol', '--profile', '--port', '--server'])
 
 function parseMode(value: string): Mode {
     if (value === 'run' || value === 'server') return value
@@ -30,8 +32,13 @@ function parsePort(value: string): number {
     return port
 }
 
+function parseServerKind(value: string): ServerKind {
+    if (value === 'http' || value === 'mcp') return value
+    throw new Error(`Unsupported server ${value}. Expected http or mcp.`)
+}
+
 export function parseCliArgs(args: string[]): CliOptions {
-    const parsed: Partial<Record<'mode' | 'protocol' | 'profile' | 'port', string>> = {}
+    const parsed: Partial<Record<'mode' | 'protocol' | 'profile' | 'port' | 'server', string>> = {}
 
     for (let index = 0; index < args.length; index += 2) {
         const name = args[index]
@@ -55,6 +62,7 @@ export function parseCliArgs(args: string[]): CliOptions {
         ? undefined
         : parsePaymentProfile(parsed.profile)
     const port = parsed.port === undefined ? undefined : parsePort(parsed.port)
+    const server = parsed.server === undefined ? 'http' : parseServerKind(parsed.server)
 
     if (mode === 'run' && profile === undefined) {
         throw new Error('Missing --profile for --mode run')
@@ -64,26 +72,35 @@ export function parseCliArgs(args: string[]): CliOptions {
         assertProtocolProfile(protocol, profile)
     }
 
+    if (server === 'mcp' && protocol !== 'x402') {
+        throw new Error(`Protocol ${protocol} does not support server ${server}`)
+    }
+
     return {
         mode,
         protocol,
         profile,
         port,
+        server,
     }
 }
 
 export function usage(): string {
     return [
         'Usage:',
+        '  bun src/payment-debug.ts --mode run --protocol x402 --server mcp --profile usdc-eip3009',
         '  bun src/payment-debug.ts --mode run --protocol x402 --profile usdc-eip3009',
         '  bun src/payment-debug.ts --mode run --protocol x402 --profile usdc-permit2',
         '  bun src/payment-debug.ts --mode run --protocol x402 --profile usdt-permit2',
         '  bun src/payment-debug.ts --mode run --protocol mpp --profile usdc-eip3009',
         '  bun src/payment-debug.ts --mode run --protocol mpp --profile usdt-permit2',
         '  bun src/payment-debug.ts --mode server --protocol x402',
+        '  bun src/payment-debug.ts --mode server --protocol x402 --server mcp',
         '  bun src/payment-debug.ts --mode server --protocol mpp',
         '',
         'Optional:',
+        '  --server http',
+        '  --server mcp',
         '  --port 48123',
     ].join('\n')
 }

@@ -17,6 +17,7 @@ Fill the `.env` values with Base Sepolia wallets, RPC URLs, and server addresses
 bun src/payment-debug.ts --mode run --protocol x402 --profile usdc-eip3009
 bun src/payment-debug.ts --mode run --protocol x402 --profile usdc-permit2
 bun src/payment-debug.ts --mode run --protocol x402 --profile usdt-permit2
+bun src/payment-debug.ts --mode run --protocol x402 --server mcp --profile usdc-eip3009
 bun src/payment-debug.ts --mode run --protocol mpp --profile usdc-eip3009
 bun src/payment-debug.ts --mode run --protocol mpp --profile usdc-permit2
 bun src/payment-debug.ts --mode run --protocol mpp --profile usdt-permit2
@@ -24,10 +25,13 @@ bun src/payment-debug.ts --mode run --protocol mpp --profile usdt-permit2
 
 `run` starts the matching local server, runs the client request, prints the decoded protocol fields, and closes the server.
 
+The x402 MCP flow starts a streamable HTTP MCP server at `/mcp`, lists tools without payment, then calls the paid `paid_tool`. The x402 payment challenge and payment payload are encoded in MCP JSON-RPC `_meta` fields by `@x402/mcp`.
+
 ## Run Only A Server
 
 ```sh
 bun src/payment-debug.ts --mode server --protocol x402
+bun src/payment-debug.ts --mode server --protocol x402 --server mcp
 bun src/payment-debug.ts --mode server --protocol mpp
 ```
 

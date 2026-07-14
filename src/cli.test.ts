@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { parseCliArgs } from './cli.js'
+import { parseCliArgs, usage } from './cli.js'
 
 describe('parseCliArgs', () => {
     test('parses named run arguments', () => {
@@ -15,6 +15,7 @@ describe('parseCliArgs', () => {
             protocol: 'x402',
             profile: 'usdc-eip3009',
             port: undefined,
+            server: 'http',
         })
     })
 
@@ -29,6 +30,7 @@ describe('parseCliArgs', () => {
             protocol: 'mpp',
             profile: undefined,
             port: undefined,
+            server: 'http',
         })
     })
 
@@ -45,6 +47,7 @@ describe('parseCliArgs', () => {
             protocol: 'mpp',
             profile: 'usdc-permit2',
             port: undefined,
+            server: 'http',
         })
     })
 
@@ -61,6 +64,26 @@ describe('parseCliArgs', () => {
             protocol: 'x402',
             profile: undefined,
             port: 48123,
+            server: 'http',
+        })
+    })
+
+    test('parses MCP server target', () => {
+        expect(parseCliArgs([
+            '--mode',
+            'run',
+            '--protocol',
+            'x402',
+            '--server',
+            'mcp',
+            '--profile',
+            'usdc-eip3009',
+        ])).toEqual({
+            mode: 'run',
+            protocol: 'x402',
+            profile: 'usdc-eip3009',
+            port: undefined,
+            server: 'mcp',
         })
     })
 
@@ -82,5 +105,37 @@ describe('parseCliArgs', () => {
             '--format',
             'json',
         ])).toThrow('Unsupported argument --format')
+    })
+
+    test('rejects unsupported server targets', () => {
+        expect(() => parseCliArgs([
+            '--mode',
+            'run',
+            '--protocol',
+            'x402',
+            '--server',
+            'stdio',
+            '--profile',
+            'usdc-eip3009',
+        ])).toThrow('Unsupported server stdio. Expected http or mcp.')
+    })
+
+    test('rejects MCP server target for MPP', () => {
+        expect(() => parseCliArgs([
+            '--mode',
+            'run',
+            '--protocol',
+            'mpp',
+            '--server',
+            'mcp',
+            '--profile',
+            'usdc-eip3009',
+        ])).toThrow('Protocol mpp does not support server mcp')
+    })
+
+    test('usage includes the x402 MCP run command', () => {
+        expect(usage()).toContain(
+            'bun src/payment-debug.ts --mode run --protocol x402 --server mcp --profile usdc-eip3009',
+        )
     })
 })
