@@ -120,8 +120,8 @@ describe('parseCliArgs', () => {
         ])).toThrow('Unsupported server stdio. Expected http or mcp.')
     })
 
-    test('rejects MCP server target for MPP', () => {
-        expect(() => parseCliArgs([
+    test('parses MPP MCP USDC EIP-3009 run arguments', () => {
+        expect(parseCliArgs([
             '--mode',
             'run',
             '--protocol',
@@ -130,12 +130,37 @@ describe('parseCliArgs', () => {
             'mcp',
             '--profile',
             'usdc-eip3009',
-        ])).toThrow('Protocol mpp does not support server mcp')
+        ])).toEqual({
+            mode: 'run',
+            protocol: 'mpp',
+            profile: 'usdc-eip3009',
+            port: undefined,
+            server: 'mcp',
+        })
+    })
+
+    test('rejects MPP MCP Permit2 profiles', () => {
+        expect(() => parseCliArgs([
+            '--mode',
+            'run',
+            '--protocol',
+            'mpp',
+            '--server',
+            'mcp',
+            '--profile',
+            'usdc-permit2',
+        ])).toThrow('Protocol mpp server mcp supports profile usdc-eip3009 only')
     })
 
     test('usage includes the x402 MCP run command', () => {
         expect(usage()).toContain(
             'bun src/payment-debug.ts --mode run --protocol x402 --server mcp --profile usdc-eip3009',
+        )
+    })
+
+    test('usage includes the MPP MCP run command', () => {
+        expect(usage()).toContain(
+            'bun src/payment-debug.ts --mode run --protocol mpp --server mcp --profile usdc-eip3009',
         )
     })
 })

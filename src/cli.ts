@@ -72,8 +72,11 @@ export function parseCliArgs(args: string[]): CliOptions {
         assertProtocolProfile(protocol, profile)
     }
 
-    if (server === 'mcp' && protocol !== 'x402') {
+    if (server === 'mcp' && protocol !== 'x402' && protocol !== 'mpp') {
         throw new Error(`Protocol ${protocol} does not support server ${server}`)
+    }
+    if (server === 'mcp' && protocol === 'mpp' && profile !== undefined && profile !== 'usdc-eip3009') {
+        throw new Error('Protocol mpp server mcp supports profile usdc-eip3009 only')
     }
 
     return {
@@ -89,6 +92,7 @@ export function usage(): string {
     return [
         'Usage:',
         '  bun src/payment-debug.ts --mode run --protocol x402 --server mcp --profile usdc-eip3009',
+        '  bun src/payment-debug.ts --mode run --protocol mpp --server mcp --profile usdc-eip3009',
         '  bun src/payment-debug.ts --mode run --protocol x402 --profile usdc-eip3009',
         '  bun src/payment-debug.ts --mode run --protocol x402 --profile usdc-permit2',
         '  bun src/payment-debug.ts --mode run --protocol x402 --profile usdt-permit2',
@@ -96,6 +100,7 @@ export function usage(): string {
         '  bun src/payment-debug.ts --mode run --protocol mpp --profile usdt-permit2',
         '  bun src/payment-debug.ts --mode server --protocol x402',
         '  bun src/payment-debug.ts --mode server --protocol x402 --server mcp',
+        '  bun src/payment-debug.ts --mode server --protocol mpp --server mcp',
         '  bun src/payment-debug.ts --mode server --protocol mpp',
         '',
         'Optional:',

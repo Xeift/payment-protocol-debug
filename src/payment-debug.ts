@@ -1,5 +1,6 @@
 import { parseCliArgs, usage } from './cli.js'
 import { runMpp, serveMpp } from './mpp-debug.js'
+import { runMppMcp, serveMppMcp } from './mpp-mcp-debug.js'
 import { resolvePort } from './runtime.js'
 import { runX402, serveX402 } from './x402-debug.js'
 import { runX402Mcp, serveX402Mcp } from './x402-mcp-debug.js'
@@ -19,6 +20,11 @@ async function main() {
             return
         }
 
+        if (options.server === 'mcp') {
+            await serveMppMcp(port)
+            return
+        }
+
         await serveMpp(port)
         return
     }
@@ -34,6 +40,11 @@ async function main() {
         }
 
         await runX402(options.profile, port)
+        return
+    }
+
+    if (options.server === 'mcp') {
+        await runMppMcp(options.profile, port)
         return
     }
 

@@ -262,7 +262,7 @@ async function runX402McpClient(port: number, profile: PaymentProfile) {
         version: '1.0.0',
     })
     const client = wrapMCPClientWithPayment(
-        mcpClient,
+        mcpClient as unknown as Parameters<typeof wrapMCPClientWithPayment>[0],
         createX402PaymentClient(profile),
         {
             autoPayment: true,

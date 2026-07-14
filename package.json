@@ -9,7 +9,7 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.12.1",
+    "@modelcontextprotocol/sdk": "1.25.0",
     "@quicknode/mpp": "0.2.0",
     "@x402/core": "2.13.0",
     "@x402/evm": "2.13.0",
