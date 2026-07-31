@@ -45,6 +45,26 @@ Use `--port` to override the protocol port:
 bun src/payment-debug.ts --mode server --protocol x402 --port 48123
 ```
 
+### Curl Commands
+
+```sh
+bun src/payment-debug.ts --mode server --protocol x402
+curl -i http://localhost:3000/premium
+
+bun src/payment-debug.ts --mode server --protocol x402 --server mcp
+curl -i -X POST http://localhost:3000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl-client","version":"1.0.0"}}}'
+
+bun src/payment-debug.ts --mode server --protocol mpp
+curl -i http://localhost:3000/premium/usdc-eip3009
+
+bun src/payment-debug.ts --mode server --protocol mpp --server mcp
+curl -i -X POST http://localhost:3000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl-client","version":"1.0.0"}}}'
+```
+
 ## Supported Profiles
 
 `x402` supports:
