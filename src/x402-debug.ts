@@ -1,4 +1,3 @@
-import { styleText } from 'node:util'
 import { x402Client } from '@x402/core/client'
 import { HTTPFacilitatorClient, x402ResourceServer, type RoutesConfig } from '@x402/core/server'
 import type { Network, PaymentRequirements, Price } from '@x402/core/types'
@@ -8,6 +7,7 @@ import { paymentMiddleware } from '@x402/express'
 import { declareErc20ApprovalGasSponsoringExtension } from '@x402/extensions'
 import { wrapFetchWithPayment } from '@x402/fetch'
 import express from 'express'
+import { styleText } from 'node:util'
 import { privateKeyToAccount } from 'viem/accounts'
 import { withEip712Logging } from './eip712.js'
 import { createLoggingFacilitatorClient } from './facilitator-log.js'
@@ -19,8 +19,8 @@ import { createHttpTraceFetch } from './http-trace.js'
 import { printBlock, printJson } from './output.js'
 import {
     BASE_SEPOLIA_NETWORK,
-    type PaymentProfile,
     profileAssets,
+    type PaymentProfile,
 } from './profiles.js'
 import { requiredEnv } from './runtime.js'
 import { closeServer, listen } from './server.js'
