@@ -38,7 +38,10 @@ const EIP3009_ABI = parseAbi([
     'function transferWithAuthorization(address from, address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce, bytes signature)',
 ])
 
-type MppPaymentProfile = PaymentProfile
+type MppPaymentProfile = Extract<
+    PaymentProfile,
+    'usdc-eip3009' | 'usdc-permit2' | 'usdt-permit2'
+>
 
 const mppPaths = {
     'usdc-eip3009': '/premium/usdc-eip3009',

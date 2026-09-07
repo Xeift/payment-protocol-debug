@@ -14,18 +14,20 @@ import express, {
     type Request as ExpressRequest,
     type Response as ExpressResponse,
 } from 'express'
-import { declareErc20ApprovalGasSponsoringExtension } from '@x402/extensions'
 import { createHttpTraceFetch } from './http-trace.js'
 import { printBlock, printJson, stringifyJson } from './output.js'
 import {
+    getProtocolProfiles,
+    isSvmPaymentProfile,
     type PaymentProfile,
-    paymentProfiles,
 } from './profiles.js'
 import { closeServer, listen } from './server.js'
 import {
     createX402Accept,
     createX402PaymentClient,
     createX402ResourceServer,
+    createX402RouteExtensions,
+    getConfiguredX402ServerProfiles,
 } from './x402-debug.js'
 
 const MCP_ENDPOINT = '/mcp'
@@ -61,16 +63,18 @@ function createMcpTraceFetch(port: number): typeof fetch {
     })
 }
 
-async function createPaidMcpServer() {
+async function createPaidMcpServer(
+    profiles: readonly PaymentProfile[] = getProtocolProfiles('x402'),
+) {
     const mcpServer = new McpServer({
         name: 'x402-mcp-debug',
         version: '1.0.0',
     })
-    const resourceServer = createX402ResourceServer()
+    const resourceServer = createX402ResourceServer(profiles)
     await resourceServer.initialize()
 
     const accepts = (
-        await Promise.all(paymentProfiles.map((profile) => (
+        await Promise.all(profiles.map((profile) => (
             resourceServer.buildPaymentRequirements(createX402Accept(profile))
         )))
     ).flat()
@@ -81,9 +85,7 @@ async function createPaidMcpServer() {
             description: 'Access to paid x402 MCP protocol debug content',
             mimeType: 'application/json',
         },
-        extensions: {
-            ...declareErc20ApprovalGasSponsoringExtension(),
-        },
+        extensions: createX402RouteExtensions(profiles),
         hooks: {
             onBeforeExecution: async ({ toolName, paymentPayload, paymentRequirements }) => {
                 await printBlock(
@@ -147,7 +149,9 @@ async function createPaidMcpServer() {
     return mcpServer
 }
 
-async function createX402McpApp() {
+async function createX402McpApp(
+    profiles: readonly PaymentProfile[] = getProtocolProfiles('x402'),
+) {
     const app = express()
     app.use(express.json())
 
@@ -178,7 +182,7 @@ async function createX402McpApp() {
                     }
                 }
 
-                const mcpServer = await createPaidMcpServer()
+                const mcpServer = await createPaidMcpServer(profiles)
                 await mcpServer.connect(
                     transport as unknown as Parameters<typeof mcpServer.connect>[0],
                 )
@@ -226,7 +230,7 @@ async function createX402McpApp() {
             server: 'mcp',
             transport: 'streamable-http',
             contentType: 'application/json',
-            profiles: paymentProfiles,
+            profiles,
             tools: [PAID_TOOL_NAME],
         })
     })
@@ -261,9 +265,10 @@ async function runX402McpClient(port: number, profile: PaymentProfile) {
         name: 'x402-mcp-debug-client',
         version: '1.0.0',
     })
+    const paymentClient = await createX402PaymentClient(profile)
     const client = wrapMCPClientWithPayment(
         mcpClient as unknown as Parameters<typeof wrapMCPClientWithPayment>[0],
-        createX402PaymentClient(profile),
+        paymentClient,
         {
             autoPayment: true,
             onPaymentRequested: async (context) => {
@@ -363,10 +368,12 @@ export async function runX402Mcp(profile: PaymentProfile, port: number) {
             },
         ],
         'magenta',
-        `[EIP-3009 generated using ${styleText('underline', '@x402/evm')}, MCP payment wrapper using ${styleText('underline', '@x402/mcp')}]`,
+        isSvmPaymentProfile(profile)
+            ? `[TransferChecked generated using ${styleText('underline', '@x402/svm')}, MCP payment wrapper using ${styleText('underline', '@x402/mcp')}]`
+            : `[EIP/Permit2 generated using ${styleText('underline', '@x402/evm')}, MCP payment wrapper using ${styleText('underline', '@x402/mcp')}]`,
     )
 
-    const server = await listen(await createX402McpApp(), port, 'x402 MCP debug server')
+    const server = await listen(await createX402McpApp([profile]), port, 'x402 MCP debug server')
 
     try {
         await runX402McpClient(port, profile)
@@ -376,6 +383,8 @@ export async function runX402Mcp(profile: PaymentProfile, port: number) {
 }
 
 export async function serveX402Mcp(port: number) {
+    const profiles = getConfiguredX402ServerProfiles()
+
     await printBlock(
         'PAYMENT DEBUG SELECTION',
         [
@@ -386,15 +395,15 @@ export async function serveX402Mcp(port: number) {
                         mode: 'server',
                         protocol: 'x402',
                         server: 'mcp',
-                        profiles: paymentProfiles,
+                        profiles,
                         port,
                     })
                 },
             },
         ],
         'magenta',
-        `[EIP-3009 generated using ${styleText('underline', '@x402/evm')}, MCP payment wrapper using ${styleText('underline', '@x402/mcp')}]`,
+        `[EVM generated using ${styleText('underline', '@x402/evm')}, SVM TransferChecked generated using ${styleText('underline', '@x402/svm')}, MCP payment wrapper using ${styleText('underline', '@x402/mcp')}]`,
     )
 
-    await listen(await createX402McpApp(), port, 'x402 MCP debug server')
+    await listen(await createX402McpApp(profiles), port, 'x402 MCP debug server')
 }

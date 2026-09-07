@@ -51,6 +51,34 @@ describe('parseCliArgs', () => {
         })
     })
 
+    test('parses x402 SVM TransferChecked run arguments', () => {
+        expect(parseCliArgs([
+            '--mode',
+            'run',
+            '--protocol',
+            'x402',
+            '--profile',
+            'usdc-transfer-checked',
+        ])).toEqual({
+            mode: 'run',
+            protocol: 'x402',
+            profile: 'usdc-transfer-checked',
+            port: undefined,
+            server: 'http',
+        })
+    })
+
+    test('rejects x402-only SVM profiles for MPP', () => {
+        expect(() => parseCliArgs([
+            '--mode',
+            'run',
+            '--protocol',
+            'mpp',
+            '--profile',
+            'usdt-transfer-checked',
+        ])).toThrow('Protocol mpp does not support profile usdt-transfer-checked')
+    })
+
     test('parses optional port as an integer', () => {
         expect(parseCliArgs([
             '--mode',
@@ -155,6 +183,15 @@ describe('parseCliArgs', () => {
     test('usage includes the x402 MCP run command', () => {
         expect(usage()).toContain(
             'bun src/payment-debug.ts --mode run --protocol x402 --server mcp --profile usdc-eip3009',
+        )
+    })
+
+    test('usage includes x402 SVM TransferChecked run commands', () => {
+        expect(usage()).toContain(
+            'bun src/payment-debug.ts --mode run --protocol x402 --profile usdc-transfer-checked',
+        )
+        expect(usage()).toContain(
+            'bun src/payment-debug.ts --mode run --protocol x402 --profile usdt-transfer-checked',
         )
     })
 

@@ -96,6 +96,8 @@ export function usage(): string {
         '  bun src/payment-debug.ts --mode run --protocol x402 --profile usdc-eip3009',
         '  bun src/payment-debug.ts --mode run --protocol x402 --profile usdc-permit2',
         '  bun src/payment-debug.ts --mode run --protocol x402 --profile usdt-permit2',
+        '  bun src/payment-debug.ts --mode run --protocol x402 --profile usdc-transfer-checked',
+        '  bun src/payment-debug.ts --mode run --protocol x402 --profile usdt-transfer-checked',
         '  bun src/payment-debug.ts --mode run --protocol mpp --profile usdc-eip3009',
         '  bun src/payment-debug.ts --mode run --protocol mpp --profile usdt-permit2',
         '  bun src/payment-debug.ts --mode server --protocol x402',
