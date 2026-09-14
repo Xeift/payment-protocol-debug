@@ -1,8 +1,52 @@
 import { describe, expect, test } from 'bun:test'
 import {
+    createX402FacilitatorConfig,
     createX402RouteExtensions,
     getConfiguredX402ServerProfiles,
 } from './x402-debug.js'
+
+describe('x402 facilitator config', () => {
+    test('omits auth headers when facilitator API key is not configured', () => {
+        const previousUrl = process.env.X402_FACILITATOR_URL
+        const previousApiKey = process.env.X402_FACILITATOR_API_KEY
+
+        try {
+            process.env.X402_FACILITATOR_URL = 'https://facilitator.example'
+            delete process.env.X402_FACILITATOR_API_KEY
+
+            const config = createX402FacilitatorConfig()
+            expect(config.url).toBe('https://facilitator.example')
+            expect(config.createAuthHeaders).toBeUndefined()
+        } finally {
+            if (previousUrl === undefined) delete process.env.X402_FACILITATOR_URL
+            else process.env.X402_FACILITATOR_URL = previousUrl
+            if (previousApiKey === undefined) delete process.env.X402_FACILITATOR_API_KEY
+            else process.env.X402_FACILITATOR_API_KEY = previousApiKey
+        }
+    })
+
+    test('adds X-API-Key auth headers for every facilitator endpoint', async () => {
+        const previousUrl = process.env.X402_FACILITATOR_URL
+        const previousApiKey = process.env.X402_FACILITATOR_API_KEY
+
+        try {
+            process.env.X402_FACILITATOR_URL = 'https://facilitator.example'
+            process.env.X402_FACILITATOR_API_KEY = 'test-api-key'
+
+            const config = createX402FacilitatorConfig()
+            expect(await config.createAuthHeaders?.()).toEqual({
+                verify: { 'X-API-Key': 'test-api-key' },
+                settle: { 'X-API-Key': 'test-api-key' },
+                supported: { 'X-API-Key': 'test-api-key' },
+            })
+        } finally {
+            if (previousUrl === undefined) delete process.env.X402_FACILITATOR_URL
+            else process.env.X402_FACILITATOR_URL = previousUrl
+            if (previousApiKey === undefined) delete process.env.X402_FACILITATOR_API_KEY
+            else process.env.X402_FACILITATOR_API_KEY = previousApiKey
+        }
+    })
+})
 
 describe('x402 server profiles and route extensions', () => {
     test('keeps legacy EVM server mode working without SVM env', () => {

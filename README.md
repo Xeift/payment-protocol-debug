@@ -9,7 +9,7 @@ bun install
 cp .env.example .env
 ```
 
-Fill the `.env` values with the Base Sepolia and/or Solana wallets, RPC URLs, token mints, and server addresses required by the profiles you want to run.
+Fill the `.env` values with the Base Sepolia and/or Solana wallets, RPC URLs, token mints, and server addresses required by the profiles you want to run. `X402_FACILITATOR_API_KEY` is optional; when set, x402 facilitator requests to `/supported`, `/verify`, and `/settle` include it as the `X-API-Key` header.
 
 ## Run A Full Flow
 

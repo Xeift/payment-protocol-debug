@@ -7,12 +7,14 @@ function buildFacilitatorRequest(
     endpoint: 'verify' | 'settle',
     paymentPayload: PaymentPayload,
     paymentRequirements: PaymentRequirements,
+    hasApiKey: boolean,
 ) {
     return {
         method: 'POST',
         url: `${url.replace(/\/+$/, '')}/${endpoint}`,
         headers: {
             'Content-Type': 'application/json',
+            ...(hasApiKey ? { 'X-API-Key': '<redacted>' } : {}),
         },
         body: {
             x402Version: paymentPayload.x402Version,
@@ -25,6 +27,7 @@ function buildFacilitatorRequest(
 export function createLoggingFacilitatorClient(
     facilitatorClient: FacilitatorClient,
     url: string,
+    hasApiKey: boolean,
 ): FacilitatorClient {
     return {
         async verify(paymentPayload, paymentRequirements) {
@@ -34,6 +37,7 @@ export function createLoggingFacilitatorClient(
                 'verify',
                 paymentPayload,
                 paymentRequirements,
+                hasApiKey,
             )))
             const response = await facilitatorClient.verify(paymentPayload, paymentRequirements)
             console.log('x402 facilitator verify response:')
@@ -47,6 +51,7 @@ export function createLoggingFacilitatorClient(
                 'settle',
                 paymentPayload,
                 paymentRequirements,
+                hasApiKey,
             )))
             const response = await facilitatorClient.settle(paymentPayload, paymentRequirements)
             console.log('x402 facilitator settle response:')

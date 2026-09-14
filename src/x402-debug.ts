@@ -1,7 +1,12 @@
 import { base58 } from '@scure/base'
 import { createKeyPairSignerFromBytes } from '@solana/kit'
 import { x402Client } from '@x402/core/client'
-import { HTTPFacilitatorClient, x402ResourceServer, type RoutesConfig } from '@x402/core/server'
+import {
+    HTTPFacilitatorClient,
+    x402ResourceServer,
+    type FacilitatorConfig,
+    type RoutesConfig,
+} from '@x402/core/server'
 import type { Network, PaymentRequirements, Price } from '@x402/core/types'
 import { ExactEvmScheme as ExactEvmClientScheme } from '@x402/evm/exact/client'
 import { ExactEvmScheme as ExactEvmServerScheme } from '@x402/evm/exact/server'
@@ -139,16 +144,36 @@ export function createX402RouteExtensions(
         : {}
 }
 
+export function createX402FacilitatorConfig(): FacilitatorConfig & { url: string } {
+    const url = requiredEnv('X402_FACILITATOR_URL')
+    const apiKey = process.env.X402_FACILITATOR_API_KEY
+
+    return {
+        url,
+        ...(apiKey
+            ? {
+                createAuthHeaders: async () => {
+                    const headers = { 'X-API-Key': apiKey }
+                    return {
+                        verify: headers,
+                        settle: headers,
+                        supported: headers,
+                    }
+                },
+            }
+            : {}),
+    }
+}
+
 export function createX402ResourceServer(
     profiles: readonly PaymentProfile[] = getProtocolProfiles('x402'),
 ) {
-    const facilitatorUrl = requiredEnv('X402_FACILITATOR_URL')
-    const httpFacilitatorClient = new HTTPFacilitatorClient({
-        url: facilitatorUrl,
-    })
+    const facilitatorConfig = createX402FacilitatorConfig()
+    const httpFacilitatorClient = new HTTPFacilitatorClient(facilitatorConfig)
     const facilitatorClient = createLoggingFacilitatorClient(
         httpFacilitatorClient,
-        facilitatorUrl,
+        facilitatorConfig.url,
+        Boolean(facilitatorConfig.createAuthHeaders),
     )
     const resourceServer = new x402ResourceServer(facilitatorClient)
 
