@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "start": "bun src/payment-debug.ts",
+    "facilitator": "bun src/payment-debug.ts --mode facilitator --chain op-sepolia",
     "test": "bun test",
     "build": "tsc --noEmit"
   },

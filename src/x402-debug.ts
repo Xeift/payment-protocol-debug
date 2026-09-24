@@ -8,7 +8,10 @@ import {
     type RoutesConfig,
 } from '@x402/core/server'
 import type { Network, PaymentRequirements, Price } from '@x402/core/types'
-import { ExactEvmScheme as ExactEvmClientScheme } from '@x402/evm/exact/client'
+import {
+    ExactEvmScheme as ExactEvmClientScheme,
+    createPermit2ApprovalTx,
+} from '@x402/evm/exact/client'
 import { ExactEvmScheme as ExactEvmServerScheme } from '@x402/evm/exact/server'
 import { paymentMiddleware } from '@x402/express'
 import { declareErc20ApprovalGasSponsoringExtension } from '@x402/extensions'
@@ -17,7 +20,9 @@ import { ExactSvmScheme as ExactSvmClientScheme } from '@x402/svm/exact/client'
 import { ExactSvmScheme as ExactSvmServerScheme } from '@x402/svm/exact/server'
 import express from 'express'
 import { styleText } from 'node:util'
+import { createPublicClient, createWalletClient, http, isAddress } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
+import { arbitrumSepolia, baseSepolia, optimismSepolia } from 'viem/chains'
 import { withEip712Logging } from './eip712.js'
 import { createLoggingFacilitatorClient } from './facilitator-log.js'
 import {
@@ -27,19 +32,33 @@ import {
 import { createHttpTraceFetch } from './http-trace.js'
 import { printBlock, printJson } from './output.js'
 import {
-    BASE_SEPOLIA_NETWORK,
     getProtocolProfiles,
     isEvmPaymentProfile,
     isSvmPaymentProfile,
     parseSolanaNetwork,
-    profileAssets,
-    type PaymentProfile,
+    profileAssetMetadata,
+    type EvmApproveProfile,
+    type EvmChain,
+    type EvmPaymentProfile,
+    type EvmProfile,
     type SvmPaymentProfile,
+    type X402PaymentProfile,
 } from './profiles.js'
 import { requiredEnv } from './runtime.js'
 import { closeServer, listen } from './server.js'
 
 const STABLECOIN_AMOUNT = '10000'
+const X402_EVM_ENV_PREFIX_BY_CHAIN: Record<EvmChain, string> = {
+    'base-sepolia': 'X402_EVM_BASE_SEPOLIA',
+    'arbitrum-sepolia': 'X402_EVM_ARBITRUM_SEPOLIA',
+    'op-sepolia': 'X402_EVM_OP_SEPOLIA',
+}
+const EVM_NETWORK_PATTERN = /^eip155:[1-9]\d*$/
+const VIEM_CHAIN_BY_NETWORK = {
+    'eip155:84532': baseSepolia,
+    'eip155:421614': arbitrumSepolia,
+    'eip155:11155420': optimismSepolia,
+} as const
 const SVM_ADDRESS_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
 
 export type X402Accept = {
@@ -48,6 +67,62 @@ export type X402Accept = {
     payTo: string
     price: Price
     maxTimeoutSeconds: number
+}
+
+export function configureX402EvmChain(chain: EvmChain): void {
+    const prefix = X402_EVM_ENV_PREFIX_BY_CHAIN[chain]
+    process.env.X402_EVM_NETWORK = requiredEnv(`${prefix}_NETWORK`)
+    process.env.X402_EVM_RPC_URL = requiredEnv(`${prefix}_RPC_URL`)
+    process.env.X402_EVM_USDT_ADDRESS = requiredEnv(`${prefix}_USDT_ADDRESS`)
+    process.env.X402_FACILITATOR_URL = requiredEnv(`${prefix}_FACILITATOR_URL`)
+
+    const facilitatorApiKey = process.env[`${prefix}_FACILITATOR_API_KEY`]
+    if (facilitatorApiKey) process.env.X402_FACILITATOR_API_KEY = facilitatorApiKey
+    else delete process.env.X402_FACILITATOR_API_KEY
+
+    const usdcAddress = process.env[`${prefix}_USDC_ADDRESS`]
+    if (usdcAddress) process.env.X402_EVM_USDC_ADDRESS = usdcAddress
+    else delete process.env.X402_EVM_USDC_ADDRESS
+}
+
+function getEvmNetwork(): Network {
+    const network = requiredEnv('X402_EVM_NETWORK')
+    if (!EVM_NETWORK_PATTERN.test(network)) {
+        throw new Error(`Invalid X402_EVM_NETWORK: ${network}. Expected eip155:<chainId>`)
+    }
+    return network as Network
+}
+
+function getEvmAssetEnvName(profile: EvmProfile): string {
+    return profile.startsWith('usdc-')
+        ? 'X402_EVM_USDC_ADDRESS'
+        : 'X402_EVM_USDT_ADDRESS'
+}
+
+function getEvmAsset(profile: EvmProfile): `0x${string}` {
+    const envName = getEvmAssetEnvName(profile)
+    const address = requiredEnv(envName)
+    if (!isAddress(address)) {
+        throw new Error(`Invalid ${envName}: expected an EVM address`)
+    }
+    return address
+}
+
+function getConfiguredViemChain() {
+    const network = getEvmNetwork()
+    const chain = VIEM_CHAIN_BY_NETWORK[network as keyof typeof VIEM_CHAIN_BY_NETWORK]
+    if (!chain) {
+        throw new Error(`Unsupported configured EVM network for approve: ${network}`)
+    }
+    return chain
+}
+
+export function createX402Permit2ApprovalTx(profile: EvmApproveProfile) {
+    const asset = getEvmAsset(profile)
+    return {
+        asset,
+        ...createPermit2ApprovalTx(asset),
+    }
 }
 
 function getSvmNetwork(): Network {
@@ -74,7 +149,7 @@ function getSvmProfileName(profile: SvmPaymentProfile): 'USDC' | 'USDT' {
     return profile === 'usdc-transfer-checked' ? 'USDC' : 'USDT'
 }
 
-export function createX402Accept(profile: PaymentProfile): X402Accept {
+export function createX402Accept(profile: X402PaymentProfile): X402Accept {
     if (isSvmPaymentProfile(profile)) {
         return {
             scheme: 'exact',
@@ -89,31 +164,32 @@ export function createX402Accept(profile: PaymentProfile): X402Accept {
         }
     }
 
-    const asset = profileAssets[profile]
+    const asset = getEvmAsset(profile)
+    const metadata = profileAssetMetadata[profile]
     const extra = (() => {
-        if (asset.assetTransferMethod === 'eip3009') {
-            if (asset.version === undefined) {
+        if (metadata.assetTransferMethod === 'eip3009') {
+            if (metadata.version === undefined) {
                 throw new Error(`Profile ${profile} is missing an EIP-3009 token version`)
             }
 
             return {
-                assetTransferMethod: asset.assetTransferMethod,
-                name: asset.name,
-                version: asset.version,
+                assetTransferMethod: metadata.assetTransferMethod,
+                name: metadata.name,
+                version: metadata.version,
             }
         }
 
         return {
-            assetTransferMethod: asset.assetTransferMethod,
+            assetTransferMethod: metadata.assetTransferMethod,
         }
     })()
 
     return {
         scheme: 'exact',
-        network: BASE_SEPOLIA_NETWORK,
+        network: getEvmNetwork(),
         payTo: requiredEnv('X402_SERVER_ADDRESS'),
         price: {
-            asset: asset.asset,
+            asset,
             amount: STABLECOIN_AMOUNT,
             extra,
         },
@@ -121,13 +197,18 @@ export function createX402Accept(profile: PaymentProfile): X402Accept {
     }
 }
 
-export function getConfiguredX402ServerProfiles(): PaymentProfile[] {
+export function getConfiguredX402ServerProfiles(): X402PaymentProfile[] {
+    const hasEvmBaseConfig = Boolean(
+        process.env.X402_EVM_NETWORK && process.env.X402_SERVER_ADDRESS,
+    )
     const hasSvmBaseConfig = Boolean(
         process.env.X402_SVM_NETWORK && process.env.X402_SVM_SERVER_ADDRESS,
     )
 
     return getProtocolProfiles('x402').filter((profile) => {
-        if (isEvmPaymentProfile(profile)) return true
+        if (isEvmPaymentProfile(profile)) {
+            return hasEvmBaseConfig && Boolean(process.env[getEvmAssetEnvName(profile)])
+        }
         if (!hasSvmBaseConfig) return false
 
         return profile === 'usdc-transfer-checked'
@@ -137,7 +218,7 @@ export function getConfiguredX402ServerProfiles(): PaymentProfile[] {
 }
 
 export function createX402RouteExtensions(
-    profiles: readonly PaymentProfile[] = getProtocolProfiles('x402'),
+    profiles: readonly X402PaymentProfile[] = getProtocolProfiles('x402'),
 ) {
     return profiles.some(isEvmPaymentProfile)
         ? declareErc20ApprovalGasSponsoringExtension()
@@ -166,7 +247,7 @@ export function createX402FacilitatorConfig(): FacilitatorConfig & { url: string
 }
 
 export function createX402ResourceServer(
-    profiles: readonly PaymentProfile[] = getProtocolProfiles('x402'),
+    profiles: readonly X402PaymentProfile[] = getProtocolProfiles('x402'),
 ) {
     const facilitatorConfig = createX402FacilitatorConfig()
     const httpFacilitatorClient = new HTTPFacilitatorClient(facilitatorConfig)
@@ -178,7 +259,7 @@ export function createX402ResourceServer(
     const resourceServer = new x402ResourceServer(facilitatorClient)
 
     if (profiles.some(isEvmPaymentProfile)) {
-        resourceServer.register(BASE_SEPOLIA_NETWORK, new ExactEvmServerScheme())
+        resourceServer.register(getEvmNetwork(), new ExactEvmServerScheme())
     }
     if (profiles.some(isSvmPaymentProfile)) {
         resourceServer.register(getSvmNetwork(), new ExactSvmServerScheme())
@@ -188,7 +269,7 @@ export function createX402ResourceServer(
 }
 
 function createX402App(
-    profiles: readonly PaymentProfile[] = getProtocolProfiles('x402'),
+    profiles: readonly X402PaymentProfile[] = getProtocolProfiles('x402'),
 ) {
     const app = express()
     app.use(express.json())
@@ -222,7 +303,7 @@ function createX402App(
 }
 
 export function selectX402PaymentRequirement(
-    profile: PaymentProfile,
+    profile: X402PaymentProfile,
     paymentRequirements: PaymentRequirements[],
 ): PaymentRequirements {
     if (isSvmPaymentProfile(profile)) {
@@ -241,10 +322,13 @@ export function selectX402PaymentRequirement(
         return selectedRequirement
     }
 
-    const asset = profileAssets[profile]
+    const network = getEvmNetwork()
+    const asset = getEvmAsset(profile)
+    const metadata = profileAssetMetadata[profile]
     const selectedRequirement = paymentRequirements.find((requirement) => (
-        requirement.asset.toLowerCase() === asset.asset.toLowerCase() &&
-        requirement.extra.assetTransferMethod === asset.assetTransferMethod
+        requirement.network === network &&
+        requirement.asset.toLowerCase() === asset.toLowerCase() &&
+        requirement.extra.assetTransferMethod === metadata.assetTransferMethod
     ))
 
     if (!selectedRequirement) {
@@ -254,7 +338,7 @@ export function selectX402PaymentRequirement(
     return selectedRequirement
 }
 
-export async function createX402PaymentClient(profile: PaymentProfile) {
+export async function createX402PaymentClient(profile: X402PaymentProfile) {
     const client = new x402Client((_version, paymentRequirements) => (
         selectX402PaymentRequirement(profile, paymentRequirements)
     ))
@@ -281,16 +365,16 @@ export async function createX402PaymentClient(profile: PaymentProfile) {
         requiredEnv('X402_CLIENT_PRIVATE_KEY') as `0x${string}`,
     )
     const account = withEip712Logging(baseAccount)
-    const asset = profileAssets[profile]
-    const exactScheme = asset.assetTransferMethod === 'permit2'
+    const metadata = profileAssetMetadata[profile]
+    const exactScheme = metadata.assetTransferMethod === 'permit2'
         ? new ExactEvmClientScheme(account, { rpcUrl: requiredEnv('X402_EVM_RPC_URL') })
         : new ExactEvmClientScheme(account)
 
-    client.register(BASE_SEPOLIA_NETWORK, exactScheme)
+    client.register(getEvmNetwork(), exactScheme)
     return client
 }
 
-async function runX402Client(port: number, profile: PaymentProfile) {
+async function runX402Client(port: number, profile: X402PaymentProfile) {
     const client = await createX402PaymentClient(profile)
     const fetchWithPayment = wrapFetchWithPayment(
         createHttpTraceFetch({
@@ -327,7 +411,72 @@ async function runX402Client(port: number, profile: PaymentProfile) {
     )
 }
 
-export async function runX402(profile: PaymentProfile, port: number) {
+export async function runX402Permit2Approval(profile: EvmApproveProfile) {
+    const chain = getConfiguredViemChain()
+    const rpcUrl = requiredEnv('X402_EVM_RPC_URL')
+    const account = privateKeyToAccount(
+        requiredEnv('X402_CLIENT_PRIVATE_KEY') as `0x${string}`,
+    )
+    const walletClient = createWalletClient({
+        account,
+        chain,
+        transport: http(rpcUrl),
+    })
+    const publicClient = createPublicClient({
+        chain,
+        transport: http(rpcUrl),
+    })
+    const approval = createX402Permit2ApprovalTx(profile)
+
+    await printBlock(
+        'PERMIT2 APPROVAL',
+        [
+            {
+                title: 'TRANSACTION',
+                print: () => {
+                    printJson({
+                        profile,
+                        network: getEvmNetwork(),
+                        owner: account.address,
+                        token: approval.asset,
+                        to: approval.to,
+                    })
+                },
+            },
+        ],
+        'magenta',
+        `[approve(Permit2, MaxUint256) generated using ${styleText('underline', '@x402/evm')}]`,
+    )
+
+    const hash = await walletClient.sendTransaction({
+        to: approval.to,
+        data: approval.data,
+    })
+    const receipt = await publicClient.waitForTransactionReceipt({ hash })
+
+    await printBlock(
+        'APPROVAL RESULT',
+        [
+            {
+                title: 'RECEIPT',
+                print: () => {
+                    printJson({
+                        hash,
+                        status: receipt.status,
+                        blockNumber: receipt.blockNumber.toString(),
+                    })
+                },
+            },
+        ],
+        'cyan',
+    )
+
+    if (receipt.status !== 'success') {
+        throw new Error(`Permit2 approval transaction reverted: ${hash}`)
+    }
+}
+
+export async function runX402(profile: X402PaymentProfile, port: number) {
     const titleSuffix = isSvmPaymentProfile(profile)
         ? `[${getSvmProfileName(profile)} TransferChecked generated using ${styleText('underline', '@x402/svm')}]`
         : profile === 'usdc-eip3009'

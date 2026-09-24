@@ -19,7 +19,7 @@ import { printBlock, printJson, stringifyJson } from './output.js'
 import {
     getProtocolProfiles,
     isSvmPaymentProfile,
-    type PaymentProfile,
+    type X402PaymentProfile,
 } from './profiles.js'
 import { closeServer, listen } from './server.js'
 import {
@@ -64,7 +64,7 @@ function createMcpTraceFetch(port: number): typeof fetch {
 }
 
 async function createPaidMcpServer(
-    profiles: readonly PaymentProfile[] = getProtocolProfiles('x402'),
+    profiles: readonly X402PaymentProfile[] = getProtocolProfiles('x402'),
 ) {
     const mcpServer = new McpServer({
         name: 'x402-mcp-debug',
@@ -150,7 +150,7 @@ async function createPaidMcpServer(
 }
 
 async function createX402McpApp(
-    profiles: readonly PaymentProfile[] = getProtocolProfiles('x402'),
+    profiles: readonly X402PaymentProfile[] = getProtocolProfiles('x402'),
 ) {
     const app = express()
     app.use(express.json())
@@ -259,7 +259,7 @@ async function printPaymentRequested(context: PaymentRequestedContext) {
     )
 }
 
-async function runX402McpClient(port: number, profile: PaymentProfile) {
+async function runX402McpClient(port: number, profile: X402PaymentProfile) {
     const nativeFetch = globalThis.fetch
     const mcpClient = new Client({
         name: 'x402-mcp-debug-client',
@@ -350,7 +350,7 @@ async function runX402McpClient(port: number, profile: PaymentProfile) {
     }
 }
 
-export async function runX402Mcp(profile: PaymentProfile, port: number) {
+export async function runX402Mcp(profile: X402PaymentProfile, port: number) {
     await printBlock(
         'PAYMENT DEBUG SELECTION',
         [
