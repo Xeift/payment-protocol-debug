@@ -38,10 +38,10 @@ export function createLoggingFacilitatorClient(
                 paymentPayload,
                 paymentRequirements,
                 hasApiKey,
-            ), 'green')
+            ), 'blue')
             const response = await facilitatorClient.verify(paymentPayload, paymentRequirements)
             console.log('x402 facilitator verify response:')
-            printJson(response, 'cyan')
+            printJson(response, 'magenta')
             return response
         },
         async settle(paymentPayload, paymentRequirements) {
@@ -52,10 +52,10 @@ export function createLoggingFacilitatorClient(
                 paymentPayload,
                 paymentRequirements,
                 hasApiKey,
-            ), 'green')
+            ), 'blue')
             const response = await facilitatorClient.settle(paymentPayload, paymentRequirements)
             console.log('x402 facilitator settle response:')
-            printJson(response, 'cyan')
+            printJson(response, 'magenta')
             return response
         },
         getSupported() {
