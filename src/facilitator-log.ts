@@ -1,6 +1,6 @@
 import type { FacilitatorClient } from '@x402/core/server'
 import type { PaymentPayload, PaymentRequirements } from '@x402/core/types'
-import { stringifyJson } from './output.js'
+import { printJson } from './output.js'
 
 function buildFacilitatorRequest(
     url: string,
@@ -32,30 +32,30 @@ export function createLoggingFacilitatorClient(
     return {
         async verify(paymentPayload, paymentRequirements) {
             console.log('x402 facilitator verify request:')
-            console.log(stringifyJson(buildFacilitatorRequest(
+            printJson(buildFacilitatorRequest(
                 url,
                 'verify',
                 paymentPayload,
                 paymentRequirements,
                 hasApiKey,
-            )))
+            ), 'green')
             const response = await facilitatorClient.verify(paymentPayload, paymentRequirements)
             console.log('x402 facilitator verify response:')
-            console.log(stringifyJson(response))
+            printJson(response, 'cyan')
             return response
         },
         async settle(paymentPayload, paymentRequirements) {
             console.log('x402 facilitator settle request:')
-            console.log(stringifyJson(buildFacilitatorRequest(
+            printJson(buildFacilitatorRequest(
                 url,
                 'settle',
                 paymentPayload,
                 paymentRequirements,
                 hasApiKey,
-            )))
+            ), 'green')
             const response = await facilitatorClient.settle(paymentPayload, paymentRequirements)
             console.log('x402 facilitator settle response:')
-            console.log(stringifyJson(response))
+            printJson(response, 'cyan')
             return response
         },
         getSupported() {
